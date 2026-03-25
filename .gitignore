@@ -1,0 +1,8 @@
+.env
+node_modules/
+.vscode/
+.idea/
+.DS_Store
+coverage/
+*.log
+backups/payment/*.dump

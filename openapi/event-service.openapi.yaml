@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: Event Service API
+  version: 1.0.0
+  description: API de gestion des evenements.
+servers:
+  - url: http://localhost
+paths:
+  /api/v1/events:
+    get:
+      operationId: listEvents
+      summary: Lister les evenements
+      responses:
+        '200':
+          description: Liste des evenements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+          links:
+            GetFirstEventFromList:
+              operationId: getEventById
+              parameters:
+                id: '$response.body#/0/id'
+    post:
+      operationId: createEvent
+      summary: Creer un evenement (ADMIN ou EVENT_CREATOR)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+            examples:
+              createEvent:
+                value:
+                  name: Concert Paris 2026
+                  venue: Paris
+                  startsAt: '2026-08-01T20:00:00.000Z'
+                  totalCapacity: 1000
+      responses:
+        '201':
+          description: Evenement cree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          links:
+            GetCreatedEvent:
+              operationId: getEventById
+              parameters:
+                id: '$response.body#/id'
+        '422':
+          description: Donnees invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/events/{id}:
+    get:
+      operationId: getEventById
+      summary: Recuperer un evenement
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evenement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          links:
+            UpdateFetchedEvent:
+              operationId: updateEventById
+              parameters:
+                id: '$request.path.id'
+            DeleteFetchedEvent:
+              operationId: deleteEventById
+              parameters:
+                id: '$request.path.id'
+        '404':
+          description: Evenement introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: updateEventById
+      summary: Mettre a jour un evenement
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Evenement mis a jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          links:
+            GetUpdatedEvent:
+              operationId: getEventById
+              parameters:
+                id: '$request.path.id'
+        '403':
+          description: Acces interdit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteEventById
+      summary: Supprimer un evenement
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Evenement supprime
+          links:
+            ListEventsAfterDelete:
+              operationId: listEvents
+        '404':
+          description: Evenement introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    Event:
+      type: object
+      required: [id, name, venue, starts_at, total_capacity, available_capacity, status, version, created_by]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        venue:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+        total_capacity:
+          type: integer
+        available_capacity:
+          type: integer
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, CLOSED]
+        version:
+          type: integer
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    CreateEventRequest:
+      type: object
+      required: [name, venue, startsAt, totalCapacity]
+      properties:
+        name:
+          type: string
+        venue:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        totalCapacity:
+          type: integer
+          minimum: 1
+    UpdateEventRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        venue:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, CLOSED]
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

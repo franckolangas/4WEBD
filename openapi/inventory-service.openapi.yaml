@@ -1,0 +1,266 @@
+openapi: 3.0.3
+info:
+  title: Inventory Service API
+  version: 1.0.0
+  description: API de gestion du stock et des reservations de places.
+servers:
+  - url: http://localhost
+paths:
+  /api/v1/inventory/events/{eventId}/availability:
+    get:
+      operationId: getEventAvailability
+      summary: Obtenir le stock disponible d'un evenement
+      tags: [Inventory]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Disponibilite courante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+        '404':
+          description: Evenement introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/inventory/reservations:
+    post:
+      operationId: createReservation
+      summary: Reserver temporairement des places
+      description: Reservation atomique avec protection anti-survente et TTL.
+      tags: [Reservations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservationRequest'
+      responses:
+        '201':
+          description: Reservation creee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+          links:
+            GetCreatedReservation:
+              operationId: getReservationById
+              parameters:
+                reservationId: '$response.body#/reservationId'
+            ConfirmCreatedReservation:
+              operationId: confirmReservationById
+              parameters:
+                reservationId: '$response.body#/reservationId'
+            ReleaseCreatedReservation:
+              operationId: releaseReservationById
+              parameters:
+                reservationId: '$response.body#/reservationId'
+        '409':
+          description: Stock insuffisant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Entree invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/inventory/reservations/{reservationId}:
+    get:
+      operationId: getReservationById
+      summary: Obtenir le detail d'une reservation
+      tags: [Reservations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reservationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reservation trouvee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+          links:
+            ConfirmReservation:
+              operationId: confirmReservationById
+              parameters:
+                reservationId: '$request.path.reservationId'
+            ReleaseReservation:
+              operationId: releaseReservationById
+              parameters:
+                reservationId: '$request.path.reservationId'
+        '404':
+          description: Reservation introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/inventory/reservations/{reservationId}/confirm:
+    post:
+      operationId: confirmReservationById
+      summary: Confirmer une reservation apres paiement
+      tags: [Reservations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reservationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reservation confirmee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+          links:
+            GetConfirmedReservation:
+              operationId: getReservationById
+              parameters:
+                reservationId: '$request.path.reservationId'
+        '404':
+          description: Reservation introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Reservation expiree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/inventory/reservations/{reservationId}/release:
+    post:
+      operationId: releaseReservationById
+      summary: Liberer une reservation (echec paiement)
+      tags: [Reservations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reservationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reservation liberee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+          links:
+            GetReleasedReservation:
+              operationId: getReservationById
+              parameters:
+                reservationId: '$request.path.reservationId'
+        '404':
+          description: Reservation introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreateReservationRequest:
+      type: object
+      required: [eventId, userId, quantity]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10
+
+    ReservationResponse:
+      type: object
+      required: [reservationId, eventId, userId, quantity, status, expiresAt]
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, RELEASED, EXPIRED]
+        expiresAt:
+          type: string
+          format: date-time
+
+    AvailabilityResponse:
+      type: object
+      required: [eventId, totalCapacity, availableCapacity]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        totalCapacity:
+          type: integer
+        availableCapacity:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: STOCK_UNAVAILABLE
+        message:
+          type: string
+          example: Le nombre de places demande depasse le stock disponible.

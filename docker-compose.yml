@@ -1,0 +1,210 @@
+x-service-env: &service-env
+  JWT_SECRET: ${JWT_SECRET:-dev-secret}
+  RABBITMQ_URL: amqp://rabbitmq:5672
+  NOTIFICATION_QUEUE: notification_queue
+
+services:
+  gateway:
+    image: nginx:1.27-alpine
+    ports:
+      - "${GATEWAY_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth-service
+      - user-service
+      - event-service
+      - event-service-2
+      - inventory-service
+      - inventory-service-2
+      - order-service
+      - payment-service
+      - notification-service
+      - docs-service
+
+  auth-service:
+    build: ./services/auth-service
+    ports:
+      - "${AUTH_PORT:-8081}:3000"
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/authdb
+      PORT: 3000
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
+      JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-2592000}
+      ADMIN_BOOTSTRAP_TOKEN: ${ADMIN_BOOTSTRAP_TOKEN:-bootstrap-admin}
+      USER_SERVICE_URL: http://user-service:3000
+      INTERNAL_SYNC_TOKEN: ${INTERNAL_SYNC_TOKEN:-internal-sync-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  user-service:
+    build: ./services/user-service
+    ports:
+      - "${USER_PORT:-8082}:3000"
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/userdb
+      PORT: 3000
+      INTERNAL_SYNC_TOKEN: ${INTERNAL_SYNC_TOKEN:-internal-sync-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  event-service:
+    build: ./services/event-service
+    ports:
+      - "${EVENT_PORT:-8083}:3000"
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/eventdb
+      PORT: 3000
+      INVENTORY_SERVICE_URL: http://inventory-service:3000
+      INTERNAL_SYNC_TOKEN: ${INTERNAL_SYNC_TOKEN:-internal-sync-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  event-service-2:
+    build: ./services/event-service
+    ports:
+      - "${EVENT2_PORT:-8093}:3000"
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/eventdb
+      PORT: 3000
+      INVENTORY_SERVICE_URL: http://inventory-service:3000
+      INTERNAL_SYNC_TOKEN: ${INTERNAL_SYNC_TOKEN:-internal-sync-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  inventory-service:
+    build: ./services/inventory-service
+    ports:
+      - "${INVENTORY_PORT:-8084}:3000"
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/inventorydb
+      PORT: 3000
+      RESERVATION_TTL_MIN: ${RESERVATION_TTL_MIN:-5}
+      INTERNAL_SYNC_TOKEN: ${INTERNAL_SYNC_TOKEN:-internal-sync-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  inventory-service-2:
+    build: ./services/inventory-service
+    ports:
+      - "${INVENTORY2_PORT:-8094}:3000"
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/inventorydb
+      PORT: 3000
+      RESERVATION_TTL_MIN: ${RESERVATION_TTL_MIN:-5}
+      INTERNAL_SYNC_TOKEN: ${INTERNAL_SYNC_TOKEN:-internal-sync-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  order-service:
+    build: ./services/order-service
+    ports:
+      - "${ORDER_PORT:-8085}:3000"
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/orderdb
+      PORT: 3000
+      PAYMENT_SERVICE_URL: http://payment-service:3000
+      INVENTORY_SERVICE_URL: http://inventory-service:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  payment-service:
+    build: ./services/payment-service
+    ports:
+      - "${PAYMENT_PORT:-8086}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/paymentdb
+      PORT: 3000
+
+  notification-service:
+    build: ./services/notification-service
+    ports:
+      - "${NOTIFICATION_PORT:-8087}:3000"
+    environment:
+      PORT: 3000
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      NOTIFICATION_QUEUE: notification_queue
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  docs-service:
+    build: ./services/docs-service
+    ports:
+      - "${DOCS_PORT:-8088}:3000"
+    environment:
+      PORT: 3000
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ticket}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticket}
+      POSTGRES_DB: ${POSTGRES_DB:-ticketing}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ticket} -d ${POSTGRES_DB:-ticketing}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  payment-db-backup:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ticket}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticket}
+      PAYMENT_BACKUP_INTERVAL_MIN: ${PAYMENT_BACKUP_INTERVAL_MIN:-60}
+    volumes:
+      - ./backups/payment:/backups
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /backups;
+        while true; do
+          ts=$$(date +%Y%m%d_%H%M%S);
+          PGPASSWORD="$${POSTGRES_PASSWORD}" pg_dump -h postgres -U "$${POSTGRES_USER}" -d paymentdb -F c -f "/backups/paymentdb_$${ts}.dump";
+          sleep $$(( $${PAYMENT_BACKUP_INTERVAL_MIN} * 60 ));
+        done
+
+volumes:
+  pgdata:

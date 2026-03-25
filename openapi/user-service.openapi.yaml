@@ -1,0 +1,252 @@
+openapi: 3.0.3
+info:
+  title: User Service API
+  version: 1.0.0
+  description: API de gestion des utilisateurs et profils.
+servers:
+  - url: http://localhost
+paths:
+  /api/v1/users/me:
+    get:
+      operationId: getCurrentUser
+      summary: Recuperer mon profil
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          links:
+            GetMeById:
+              operationId: getUserById
+              parameters:
+                id: '$response.body#/id'
+        '401':
+          description: Non authentifie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/users:
+    get:
+      operationId: listUsers
+      summary: Lister les utilisateurs (ADMIN)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Liste des utilisateurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+          links:
+            GetFirstUserFromList:
+              operationId: getUserById
+              parameters:
+                id: '$response.body#/0/id'
+        '403':
+          description: Acces interdit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: createUser
+      summary: Creer un utilisateur (ADMIN)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            examples:
+              createUser:
+                value:
+                  email: operator@example.com
+                  fullName: Operateur Event
+                  locale: fr
+                  role: EVENT_CREATOR
+      responses:
+        '201':
+          description: Utilisateur cree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          links:
+            GetCreatedUser:
+              operationId: getUserById
+              parameters:
+                id: '$response.body#/id'
+        '409':
+          description: Email deja existant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/users/{id}:
+    get:
+      operationId: getUserById
+      summary: Recuperer un utilisateur
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          links:
+            UpdateFetchedUser:
+              operationId: updateUserById
+              parameters:
+                id: '$request.path.id'
+            DeleteFetchedUser:
+              operationId: deleteUserById
+              parameters:
+                id: '$request.path.id'
+        '404':
+          description: Utilisateur introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: updateUserById
+      summary: Mettre a jour un utilisateur
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Utilisateur mis a jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          links:
+            GetUpdatedUser:
+              operationId: getUserById
+              parameters:
+                id: '$request.path.id'
+            DeleteUpdatedUser:
+              operationId: deleteUserById
+              parameters:
+                id: '$request.path.id'
+        '404':
+          description: Utilisateur introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteUserById
+      summary: Supprimer un utilisateur (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Utilisateur supprime
+          links:
+            ListUsersAfterDelete:
+              operationId: listUsers
+        '404':
+          description: Utilisateur introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, email, full_name, locale, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        locale:
+          type: string
+          enum: [fr, en]
+        role:
+          type: string
+          enum: [ADMIN, EVENT_CREATOR, USER]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateUserRequest:
+      type: object
+      required: [email, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        locale:
+          type: string
+          enum: [fr, en]
+        role:
+          type: string
+          enum: [ADMIN, EVENT_CREATOR, USER]
+    UpdateUserRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        locale:
+          type: string
+          enum: [fr, en]
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

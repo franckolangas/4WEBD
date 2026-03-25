@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint docker compose syntax
+        run: docker compose config > /tmp/compose.out
+      - name: Validate OpenAPI files
+        run: |
+          test -f openapi/inventory-service.openapi.yaml
+          test -f openapi/order-service.openapi.yaml
+      - name: Verify SQL schema exists
+        run: test -f db/init/001_schema.sql

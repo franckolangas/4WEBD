@@ -1,0 +1,301 @@
+openapi: 3.0.3
+info:
+  title: Order and Ticket Service API
+  version: 1.0.0
+  description: API de gestion des commandes et des billets.
+servers:
+  - url: http://localhost
+paths:
+  /api/v1/orders:
+    post:
+      operationId: createOrder
+      summary: Creer une commande a partir d'une reservation
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Commande creee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+          links:
+            GetCreatedOrder:
+              operationId: getOrderById
+              parameters:
+                orderId: '$response.body#/orderId'
+            PayCreatedOrder:
+              operationId: payOrderById
+              parameters:
+                orderId: '$response.body#/orderId'
+        '409':
+          description: Reservation invalide ou deja consommee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Entree invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/orders/{orderId}:
+    get:
+      operationId: getOrderById
+      summary: Consulter une commande
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Commande trouvee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+          links:
+            PayOrder:
+              operationId: payOrderById
+              parameters:
+                orderId: '$request.path.orderId'
+        '404':
+          description: Commande introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/orders/{orderId}/pay:
+    post:
+      operationId: payOrderById
+      summary: Lancer le paiement simule
+      description: Cette route appelle le service Payment simule puis met a jour le statut de commande.
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayOrderRequest'
+      responses:
+        '200':
+          description: Paiement traite
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPaymentResponse'
+          links:
+            ListTicketsAfterPayment:
+              operationId: listMyTickets
+        '402':
+          description: Paiement refuse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Timeout paiement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/tickets/my:
+    get:
+      operationId: listMyTickets
+      summary: Lister mes billets
+      tags: [Tickets]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Liste billets utilisateur
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TicketResponse'
+          links:
+            GetFirstTicket:
+              operationId: getTicketById
+              parameters:
+                ticketId: '$response.body#/0/ticketId'
+
+  /api/v1/tickets/{ticketId}:
+    get:
+      operationId: getTicketById
+      summary: Consulter un billet
+      tags: [Tickets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Billet trouve
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+          links:
+            GetOrderFromTicket:
+              operationId: getOrderById
+              parameters:
+                orderId: '$response.body#/orderId'
+        '403':
+          description: Acces refuse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Billet introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required: [reservationId, userId, eventId, amountCents, currency]
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        amountCents:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+          example: EUR
+
+    PayOrderRequest:
+      type: object
+      required: [scenario]
+      properties:
+        scenario:
+          type: string
+          enum: [success, declined, timeout]
+
+    OrderResponse:
+      type: object
+      required: [orderId, reservationId, userId, eventId, status, amountCents, currency]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        reservationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, PAID, FAILED, EXPIRED]
+        amountCents:
+          type: integer
+        currency:
+          type: string
+
+    OrderPaymentResponse:
+      type: object
+      required: [orderId, paymentStatus, orderStatus]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        paymentStatus:
+          type: string
+          enum: [AUTHORIZED, DECLINED, TIMEOUT]
+        orderStatus:
+          type: string
+          enum: [PAID, FAILED, EXPIRED]
+
+    TicketResponse:
+      type: object
+      required: [ticketId, orderId, eventId, userId, ticketCode, status]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        ticketCode:
+          type: string
+        status:
+          type: string
+          enum: [VALID, CANCELLED, USED]
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: RESERVATION_EXPIRED
+        message:
+          type: string
+          example: La reservation n'est plus valide.

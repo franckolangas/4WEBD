@@ -1,0 +1,95 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  version: 1.0.0
+  description: API de simulation d'envoi de notifications email/SMS.
+servers:
+  - url: http://localhost
+paths:
+  /api/v1/notifications:
+    get:
+      operationId: listNotifications
+      summary: Lister les notifications simulees
+      responses:
+        '200':
+          description: Liste des notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+  /api/v1/notifications/simulate/send:
+    post:
+      operationId: simulateSendNotification
+      summary: Simuler un envoi email ou SMS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendNotificationRequest'
+            examples:
+              emailConfirmation:
+                value:
+                  channel: email
+                  to: user@example.com
+                  templateKey: purchase-confirmation
+                  locale: fr
+                  payload:
+                    orderId: f89b5c6f-9bd0-4d47-b2d4-43c81db8c2a8
+                    eventId: 77d6cb2a-a200-4c0f-afc0-a8fdd44b8f2e
+      responses:
+        '202':
+          description: Notification acceptee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          links:
+            ListNotificationsAfterSend:
+              operationId: listNotifications
+
+components:
+  schemas:
+    SendNotificationRequest:
+      type: object
+      required: [channel, to]
+      properties:
+        channel:
+          type: string
+          enum: [email, sms]
+        to:
+          type: string
+        templateKey:
+          type: string
+          default: purchase-confirmation
+        locale:
+          type: string
+          enum: [fr, en]
+        payload:
+          type: object
+          additionalProperties: true
+    Notification:
+      type: object
+      required: [notificationId, channel, to, locale, sentAt]
+      properties:
+        notificationId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          enum: [email, sms]
+        to:
+          type: string
+        templateKey:
+          type: string
+        locale:
+          type: string
+          enum: [fr, en]
+        payload:
+          type: object
+          additionalProperties: true
+        sentAt:
+          type: string
+          format: date-time

@@ -1,0 +1,96 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  version: 1.0.0
+  description: API de simulation de paiement carte bancaire.
+servers:
+  - url: http://localhost
+paths:
+  /api/v1/payments/simulate/charge:
+    post:
+      operationId: simulateCharge
+      summary: Simuler un paiement carte bancaire
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimulatePaymentRequest'
+            examples:
+              success:
+                value:
+                  orderId: f89b5c6f-9bd0-4d47-b2d4-43c81db8c2a8
+                  amountCents: 4900
+                  currency: EUR
+                  scenario: success
+              declined:
+                value:
+                  orderId: f89b5c6f-9bd0-4d47-b2d4-43c81db8c2a8
+                  amountCents: 4900
+                  currency: EUR
+                  scenario: declined
+      responses:
+        '200':
+          description: Paiement autorise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '402':
+          description: Paiement refuse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '504':
+          description: Timeout paiement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '422':
+          description: Donnees invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    SimulatePaymentRequest:
+      type: object
+      required: [orderId, amountCents, currency]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        amountCents:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+          example: EUR
+        scenario:
+          type: string
+          enum: [success, declined, timeout]
+          default: success
+    PaymentResponse:
+      type: object
+      required: [paymentId, status, message]
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [AUTHORIZED, DECLINED, TIMEOUT]
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
