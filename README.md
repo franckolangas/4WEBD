@@ -245,6 +245,23 @@ Commandes utiles:
 ./scripts/migrate-add-operator-role.sh
 ```
 
+## Stripe (optionnel)
+
+Par defaut, le `payment-service` fonctionne en mode `SIMULATED`.
+
+Pour activer Stripe (mode test):
+
+```bash
+PAYMENT_PROVIDER=STRIPE
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+```
+
+Endpoints utiles:
+
+- `POST /api/v1/payments/charge`
+- `POST /api/v1/payments/webhook`
+
 ## Securite (version actuelle)
 
 - Mot de passe stocke sous forme hachee (bcryptjs dans cette version)

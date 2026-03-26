@@ -2,10 +2,45 @@ openapi: 3.0.3
 info:
   title: Payment Service API
   version: 1.0.0
-  description: API de simulation de paiement carte bancaire.
+  description: API de paiement (mode SIMULATED ou STRIPE).
 servers:
   - url: http://localhost
 paths:
+  /api/v1/payments/charge:
+    post:
+      operationId: createCharge
+      summary: Creer un paiement (SIMULATED ou STRIPE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChargeRequest'
+      responses:
+        '200':
+          description: Paiement autorise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '402':
+          description: Paiement refuse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '504':
+          description: Timeout paiement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '422':
+          description: Donnees invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/payments/simulate/charge:
     post:
       operationId: simulateCharge
@@ -55,8 +90,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/payments/webhook:
+    post:
+      operationId: stripeWebhook
+      summary: Recevoir les webhooks Stripe
+      responses:
+        '200':
+          description: Webhook recu
+        '400':
+          description: Signature invalide
+        '503':
+          description: Webhook desactive
+
 components:
   schemas:
+    ChargeRequest:
+      type: object
+      required: [orderId, amountCents, currency]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        amountCents:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+          example: EUR
+        scenario:
+          type: string
+          enum: [success, declined, timeout]
+          default: success
+        idempotencyKey:
+          type: string
     SimulatePaymentRequest:
       type: object
       required: [orderId, amountCents, currency]
@@ -80,10 +146,15 @@ components:
       properties:
         paymentId:
           type: string
-          format: uuid
+          description: UUID (simulation) ou PaymentIntent ID Stripe
         status:
           type: string
           enum: [AUTHORIZED, DECLINED, TIMEOUT]
+        provider:
+          type: string
+          enum: [SIMULATED, STRIPE]
+        paymentIntentId:
+          type: string
         message:
           type: string
     ErrorResponse:

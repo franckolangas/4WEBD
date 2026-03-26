@@ -131,6 +131,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ticket}:${POSTGRES_PASSWORD:-ticket}@postgres:5432/paymentdb
       PORT: 3000
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-SIMULATED}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
 
   notification-service:
     build: ./services/notification-service

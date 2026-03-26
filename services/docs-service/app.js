@@ -38,17 +38,16 @@ app.get('/openapi/', (_req, res) => {
   });
 });
 
-const swaggerMiddleware = swaggerUi.setup(undefined, {
+const swaggerOptions = {
   explorer: true,
   swaggerOptions: {
     urls: docs,
+    urlsPrimaryName: 'Auth Service',
     docExpansion: 'none'
   }
-});
+};
 
-app.use('/docs', swaggerUi.serve);
-app.get('/docs', swaggerMiddleware);
-app.get('/docs/', swaggerMiddleware);
+app.use('/docs', swaggerUi.serveFiles(null, swaggerOptions), swaggerUi.setup(null, swaggerOptions));
 
 app.listen(port, () => {
   console.log(`docs-service listening on ${port}`);

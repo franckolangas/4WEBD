@@ -154,14 +154,15 @@ app.post('/api/v1/orders/:orderId/pay', auth, async (req, res) => {
     return res.status(409).json({ code: 'INVALID_STATUS', message: 'Commande deja traitee.' });
   }
 
-  const paymentRes = await fetch(`${paymentServiceUrl}/api/v1/payments/simulate/charge`, {
+  const paymentRes = await fetch(`${paymentServiceUrl}/api/v1/payments/charge`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       orderId: order.id,
       amountCents: order.total_amount_cents,
       currency: order.currency,
-      scenario
+      scenario,
+      idempotencyKey: req.headers['idempotency-key'] || undefined
     })
   });
 
@@ -178,10 +179,12 @@ app.post('/api/v1/orders/:orderId/pay', auth, async (req, res) => {
     orderStatus = 'EXPIRED';
   }
 
+  const provider = paymentPayload.provider === 'STRIPE' ? 'STRIPE' : 'SIMULATED';
+
   await pool.query(
-    `INSERT INTO payment_transactions (id, order_id, amount_cents, currency, status, failure_reason)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [uuidv4(), order.id, order.total_amount_cents, order.currency, paymentStatus, paymentPayload.message || null]
+    `INSERT INTO payment_transactions (id, order_id, provider, amount_cents, currency, status, failure_reason)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [uuidv4(), order.id, provider, order.total_amount_cents, order.currency, paymentStatus, paymentPayload.message || null]
   );
 
   if (orderStatus === 'PAID') {
