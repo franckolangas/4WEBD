@@ -157,8 +157,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ticket}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticket}
       POSTGRES_DB: ${POSTGRES_DB:-ticketing}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro

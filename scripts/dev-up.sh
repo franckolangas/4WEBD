@@ -3,4 +3,4 @@ set -euo pipefail
 
 docker compose up -d --build
 
-echo "Stack demarree. API Gateway: http://localhost:${GATEWAY_HTTP_PORT:-80}"
+echo "Stack demarree. API Gateway: http://localhost:${GATEWAY_HTTP_PORT:-8080}"

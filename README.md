@@ -141,6 +141,8 @@ node tests/integration/i18n/run-locale-validation.js
 - notification-service: 8087
 - docs-service: 8088
 
+PostgreSQL n'est pas expose sur un port hote: il est accessible uniquement depuis le reseau Docker interne.
+
 ## Scalabilite actuelle
 
 - event-service: x2 (load balance par Nginx)
@@ -228,6 +230,7 @@ Retour: `accessToken` a utiliser dans `Authorization: Bearer <token>`
 - Backup periodique automatique via le service `payment-db-backup` dans Docker Compose.
 - Intervalle configurable avec `PAYMENT_BACKUP_INTERVAL_MIN`.
 - Fichiers de backup ecrits dans `backups/payment/`.
+- Les donnees PostgreSQL sont persistees localement dans le volume Docker `pgdata`.
 
 Commandes utiles:
 
